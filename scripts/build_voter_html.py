@@ -93,6 +93,7 @@ HEAD_TEMPLATE = """<!DOCTYPE html>
       <th data-key="gender">लिंग</th>
       <th data-key="status">स्थिति</th>
       <th data-key="area">क्षेत्र</th>
+      <th data-key="page">पृष्ठ</th>
     </tr>
   </thead>
   <tbody id="tableBody"></tbody>
@@ -141,6 +142,7 @@ function renderTable(list) {
       <td>${v.gender}</td>
       <td><span class="badge ${badgeClass}">${statusText}</span></td>
       <td>${v.area}</td>
+      <td>${v.page ?? ''}</td>
     `;
     frag.appendChild(tr);
   });
@@ -235,6 +237,7 @@ def convert_record(r):
         "status": status,
         "reason": reason,
         "area": r.get("area", ""),
+        "page": r.get("page"),
     }
 
 
