@@ -16,6 +16,14 @@
   meta: "राज्य निर्वाचन आयोग, राजस्थान | नगरनिगम: भरतपुर | वार्ड 28 | भाग 3 | मतदान केंद्र: 85 - दौलतराम शर्मा राजकीय उच्च प्राथमिक विद्यालय, नमक कटरा"
   output: docs/ward28_part3.html
 
+
+- pdf: pdfs/BHARATPUR NAGAR NIGAM-Ward No-030-Part No-001.pdf
+  start_page: 3
+  end_page: 60
+  title: "भरतपुर वार्ड 30 भाग 1"
+  meta: "राज्य निर्वाचन आयोग, राजस्थान | नगरनिगम: भरतपुर | वार्ड 30 | भाग 1 | मतदान केंद्र: 89 - सपरजरत बपनलकप उच मपधखनमक नवदपलख पपई बपग भरतपपर "
+  output: docs/ward30_part1.html  
+
 # - pdf: pdfs/NEXT_WARD_FILE.pdf
 #   start_page: 3
 #   end_page: 40
