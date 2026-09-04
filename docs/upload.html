@@ -259,7 +259,7 @@ $('submitBtn').addEventListener('click', async () => {
     // Step 2: update config.yml
     setStep('config', 'active');
     const configData = await ghApi('/contents/config.yml');
-    const configText = atob(configData.content.replace(/\n/g, ''));
+    const configText = decodeURIComponent(escape(atob(configData.content.replace(/\n/g, ''))));
     const newConfigText = upsertConfigEntry(configText, {
       pdf: pdfPath, title, meta, output: outputPath,
     });
