@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>मतदाता सूची अपलोड डैशबोर्ड</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Noto Sans Devanagari', Arial, sans-serif; background:#f4f4f4; margin:0; padding:24px; }
+  .card { max-width:640px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 1px 8px rgba(0,0,0,0.12); padding:28px 32px; }
+  h1 { font-size:20px; margin:0 0 4px 0; text-align:center; }
+  .sub { text-align:center; color:#777; font-size:13px; margin-bottom:24px; }
+  label { display:block; font-size:13px; font-weight:600; color:#333; margin:16px 0 5px 0; }
+  input[type=text], input[type=password], textarea {
+    width:100%; padding:9px 11px; border:1px solid #ccc; border-radius:7px; font-size:14px; font-family:inherit;
+  }
+  input[type=file] { width:100%; padding:8px 0; }
+  .row2 { display:flex; gap:12px; }
+  .row2 > div { flex:1; }
+  .hint { font-size:11.5px; color:#888; margin-top:4px; line-height:1.5; }
+  details { margin-top:16px; background:#f8f9fb; border-radius:8px; padding:10px 14px; }
+  summary { cursor:pointer; font-size:13px; font-weight:600; color:#2c3e50; }
+  button {
+    width:100%; margin-top:22px; padding:13px; font-size:15px; font-weight:700; color:#fff;
+    background:#2c7be5; border:none; border-radius:8px; cursor:pointer;
+  }
+  button:hover:not(:disabled) { background:#1f66c9; }
+  button:disabled { background:#aac4e8; cursor:not-allowed; }
+
+  #progress { display:none; margin-top:22px; }
+  .step { display:flex; align-items:center; gap:10px; padding:8px 0; font-size:13.5px; color:#555; }
+  .step .icon { width:20px; text-align:center; }
+  .step.active { color:#1a1a1a; font-weight:600; }
+  .step.done .icon::before { content:"✅"; }
+  .step.active .icon::before { content:"🔄"; display:inline-block; animation:spin 1.2s linear infinite; }
+  .step.pending .icon::before { content:"⏳"; opacity:.4; }
+  .step.failed .icon::before { content:"❌"; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+  #elapsed { text-align:center; font-size:12px; color:#999; margin-top:10px; }
+  #resultBox { display:none; margin-top:20px; padding:16px; background:#e9f9ee; border:1px solid #b6e6c4; border-radius:8px; text-align:center; }
+  #resultBox a.dl { display:inline-block; margin-top:8px; padding:10px 22px; background:#1eae5c; color:#fff; border-radius:7px; text-decoration:none; font-weight:700; font-size:14px; }
+  #errorBox { display:none; margin-top:20px; padding:14px; background:#fdeaea; border:1px solid #f3b7b7; border-radius:8px; color:#8a1414; font-size:13.5px; }
+  #errorBox a { color:#8a1414; font-weight:700; }
+  .stepLog { font-size:11px; color:#999; margin-left:30px; }
+  .back { display:block; text-align:center; margin-bottom:14px; font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <a class="back" href="index.html">← सभी डैशबोर्ड</a>
+  <h1>मतदाता सूची अपलोड डैशबोर्ड</h1>
+  <div class="sub">PDF अपलोड करें → OCR प्रोसेसिंग देखें → डैशबोर्ड डाउनलोड करें</div>
+
+  <details id="repoDetails">
+    <summary>⚙️ GitHub Repo सेटिंग्स (एक बार सेट करें)</summary>
+    <label>GitHub Username / Org</label>
+    <input type="text" id="owner" placeholder="e.g. mega-dynamics">
+    <label>Repository Name</label>
+    <input type="text" id="repo" placeholder="e.g. voter_list_generate">
+    <label>Personal Access Token (fine-grained, this repo only, Contents: Read & write, Actions: Read-only)</label>
+    <input type="password" id="token" placeholder="github_pat_...">
+    <div class="hint">
+      Token कभी भी कहीं भेजा नहीं जाता सिवाय सीधे GitHub API के, और सिर्फ आपके browser की इस tab में रहता है (page बंद करने पर मिट जाता है)। बनाने का तरीका: GitHub → Settings → Developer settings → Fine-grained tokens → Generate new → केवल इस repo को select करें → Repository permissions में "Contents" को "Read and write" और "Actions" को "Read-only" करें।
+    </div>
+  </details>
+
+  <label>PDF फ़ाइल</label>
+  <input type="file" id="pdfFile" accept="application/pdf">
+
+  <div class="row2">
+    <div>
+      <label>Title (डैशबोर्ड पर दिखेगा)</label>
+      <input type="text" id="title" placeholder="भरतपुर वार्ड 28 भाग 3">
+    </div>
+    <div>
+      <label>Output फ़ाइल नाम</label>
+      <input type="text" id="outputName" placeholder="ward28_part3">
+    </div>
+  </div>
+
+  <label>Meta (वैकल्पिक — मतदान केंद्र आदि)</label>
+  <input type="text" id="meta" placeholder="राज्य निर्वाचन आयोग, राजस्थान | वार्ड 28 | भाग 3 | ...">
+
+  <div class="hint" style="margin-top:14px;">
+    पेज रेंज अपने आप detect हो जाएगी (PDF के footer से) — कुछ भरने की ज़रूरत नहीं।
+  </div>
+
+  <button id="submitBtn">अपलोड करें और Process शुरू करें</button>
+
+  <div id="progress">
+    <div class="step" data-step="upload"><span class="icon"></span> PDF अपलोड हो रहा है...</div>
+    <div class="step" data-step="config"><span class="icon"></span> config.yml अपडेट हो रहा है...</div>
+    <div class="step" data-step="trigger"><span class="icon"></span> GitHub Actions workflow शुरू होने का इंतज़ार...</div>
+    <div class="step" data-step="ocr"><span class="icon"></span> OCR प्रोसेसिंग चल रही है (सबसे धीमा चरण, ~20 सेकंड/पेज)...</div>
+    <div class="step" data-step="deploy"><span class="icon"></span> Dashboard publish हो रहा है...</div>
+    <div id="elapsed"></div>
+  </div>
+
+  <div id="resultBox">
+    <div>🎉 डैशबोर्ड तैयार है!</div>
+    <a class="dl" id="downloadLink" href="#" target="_blank">डाउनलोड / देखें</a>
+  </div>
+
+  <div id="errorBox"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// Remember owner/repo (not sensitive) but never persist the token
+['owner','repo'].forEach(id => {
+  const saved = localStorage.getItem('vro_' + id);
+  if (saved) $(id).value = saved;
+  $(id).addEventListener('change', () => localStorage.setItem('vro_' + id, $(id).value));
+});
+
+$('pdfFile').addEventListener('change', () => {
+  const f = $('pdfFile').files[0];
+  if (f && !$('outputName').value) {
+    $('outputName').value = f.name.replace(/\.pdf$/i, '').toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  }
+});
+
+function setStep(name, state) {
+  const el = document.querySelector(`.step[data-step="${name}"]`);
+  el.classList.remove('pending', 'active', 'done', 'failed');
+  el.classList.add(state);
+}
+function resetSteps() {
+  ['upload','config','trigger','ocr','deploy'].forEach(s => setStep(s, 'pending'));
+}
+function showError(msg, runUrl) {
+  const box = $('errorBox');
+  box.style.display = 'block';
+  box.innerHTML = msg + (runUrl ? `<br><a href="${runUrl}" target="_blank">Actions log देखें →</a>` : '');
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function yamlQuote(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+async function ghApi(path, opts = {}) {
+  const owner = $('owner').value.trim();
+  const repo = $('repo').value.trim();
+  const token = $('token').value.trim();
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+    ...opts,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub API ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function getFileSha(path) {
+  try {
+    const data = await ghApi(`/contents/${path}`);
+    return data.sha;
+  } catch (e) {
+    return null; // file doesn't exist yet
+  }
+}
+
+async function putFile(path, base64Content, message, sha) {
+  return ghApi(`/contents/${path}`, {
+    method: 'PUT',
+    body: JSON.stringify({ message, content: base64Content, ...(sha ? { sha } : {}) }),
+  });
+}
+
+function upsertConfigEntry(configText, entry) {
+  const outputLine = `output: ${entry.output}`;
+  const blockRe = /- pdf:[\s\S]*?(?=\n- pdf:|\n*$)/g;
+  const newBlock = `- pdf: ${entry.pdf}\n  title: "${yamlQuote(entry.title)}"\n  meta: "${yamlQuote(entry.meta)}"\n  output: ${entry.output}`;
+  let replaced = false;
+  let result = configText.replace(blockRe, (block) => {
+    if (block.includes(outputLine)) { replaced = true; return newBlock; }
+    return block;
+  });
+  if (!replaced) result = result.trimEnd() + '\n\n' + newBlock + '\n';
+  return result;
+}
+
+function fmtElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+async function pollRun(runId, startTime) {
+  setStep('ocr', 'active');
+  const elapsedEl = $('elapsed');
+  while (true) {
+    await new Promise(r => setTimeout(r, 8000));
+    elapsedEl.textContent = `बीता समय: ${fmtElapsed(Date.now() - startTime)}`;
+    const run = await ghApi(`/actions/runs/${runId}`);
+    if (run.status === 'completed') {
+      if (run.conclusion === 'success') {
+        setStep('ocr', 'done');
+        setStep('deploy', 'done');
+        return true;
+      } else {
+        setStep('ocr', 'failed');
+        showError(`Workflow असफल रहा (${run.conclusion})।`, run.html_url);
+        return false;
+      }
+    }
+  }
+}
+
+$('submitBtn').addEventListener('click', async () => {
+  const owner = $('owner').value.trim();
+  const repo = $('repo').value.trim();
+  const token = $('token').value.trim();
+  const file = $('pdfFile').files[0];
+  const title = $('title').value.trim() || 'मतदाता सूची';
+  const meta = $('meta').value.trim();
+  const outputName = $('outputName').value.trim();
+
+  $('errorBox').style.display = 'none';
+  $('resultBox').style.display = 'none';
+
+  if (!owner || !repo || !token) { showError('कृपया सबसे पहले repo settings भरें (ऊपर ⚙️ खोलें)।'); return; }
+  if (!file) { showError('कृपया एक PDF फ़ाइल चुनें।'); return; }
+  if (!outputName) { showError('कृपया output फ़ाइल नाम भरें।'); return; }
+
+  $('submitBtn').disabled = true;
+  $('progress').style.display = 'block';
+  resetSteps();
+
+  const pdfPath = `pdfs/${file.name}`;
+  const outputPath = `docs/${outputName}.html`;
+
+  try {
+    // Step 1: upload PDF
+    setStep('upload', 'active');
+    const buf = await file.arrayBuffer();
+    const b64 = arrayBufferToBase64(buf);
+    const existingPdfSha = await getFileSha(pdfPath);
+    await putFile(pdfPath, b64, `Upload ${file.name} via upload dashboard`, existingPdfSha);
+    setStep('upload', 'done');
+
+    // Step 2: update config.yml
+    setStep('config', 'active');
+    const configData = await ghApi('/contents/config.yml');
+    const configText = atob(configData.content.replace(/\n/g, ''));
+    const newConfigText = upsertConfigEntry(configText, {
+      pdf: pdfPath, title, meta, output: outputPath,
+    });
+    const beforeCommitTime = new Date().toISOString();
+    await putFile('config.yml', btoa(unescape(encodeURIComponent(newConfigText))),
+      `Add/update ${outputName} via upload dashboard`, configData.sha);
+    setStep('config', 'done');
+
+    // Step 3: find the workflow run that our config.yml push triggered
+    setStep('trigger', 'active');
+    let runId = null;
+    for (let attempt = 0; attempt < 15 && !runId; attempt++) {
+      await new Promise(r => setTimeout(r, 4000));
+      const runs = await ghApi('/actions/runs?event=push&per_page=5');
+      const match = runs.workflow_runs.find(r => r.created_at >= beforeCommitTime);
+      if (match) runId = match.id;
+    }
+    if (!runId) throw new Error('Workflow run नहीं मिला। Actions tab में manually चेक करें।');
+    setStep('trigger', 'done');
+
+    // Step 4: poll until done
+    const startTime = Date.now();
+    const ok = await pollRun(runId, startTime);
+    if (!ok) { $('submitBtn').disabled = false; return; }
+
+    // Step 5: show download link
+    const pagesUrl = `https://${owner}.github.io/${repo}/${outputName}.html`;
+    $('downloadLink').href = pagesUrl;
+    $('resultBox').style.display = 'block';
+  } catch (err) {
+    showError('गड़बड़ी: ' + err.message);
+  } finally {
+    $('submitBtn').disabled = false;
+  }
+});
+</script>
+</body>
+</html>

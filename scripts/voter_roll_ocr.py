@@ -110,6 +110,34 @@ def ocr_text(img, lang, psm, whitelist=None):
 ALNUM_WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/"
 
 
+def detect_page_range(pdf_path):
+    """Auto-detect the (start_page, end_page) of the main voter-roll grid
+    by OCR-reading the 'पृष्ठ संख्या : X / Y' footer on page 3, which is
+    always the first grid page in this document format (pages 1-2 are
+    always the cover page + ward-map page). Y is the total page count of
+    the *main roll section specifically* -- supplement pages restart
+    their own "1/N" numbering, so this cleanly gives the exact last grid
+    page without needing to scan the whole document."""
+    work_dir = "/tmp/voter_ocr_pagedetect"
+    os.makedirs(work_dir, exist_ok=True)
+    prefix = os.path.join(work_dir, "pd")
+    for f in glob.glob(prefix + "*"):
+        os.remove(f)
+    subprocess.run(["pdftoppm", "-jpeg", "-r", "300", "-f", "3", "-l", "3", pdf_path, prefix], check=True)
+    candidates = glob.glob(prefix + "-*.jpg")
+    if not candidates:
+        raise RuntimeError("Could not rasterize page 3 for page-range auto-detection")
+    img = cv2.imread(candidates[0])
+    h, w = img.shape[:2]
+    footer = img[int(h * 0.94):h, 0:w]
+    text = ocr_text(footer, "hin", 6)
+    m = re.search(r"(\d+)\s*/\s*(\d+)", text)
+    if not m:
+        raise RuntimeError(f"Could not parse page-range footer (got: {text!r}). "
+                            f"Specify --start/--end manually instead.")
+    return 3, int(m.group(2))
+
+
 def detect_status_prefix(cell, h, w):
     """OCR just the narrow left slice of the box-number rectangle, where an
     S/E/R/O deletion-reason letter would appear if present. Returns '' if
@@ -276,19 +304,34 @@ def process_page(img_path, start_sno, locality_default="", page_num=None):
 
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)
     pdf_path = sys.argv[1]
+
+    if "--detect-range" in sys.argv:
+        # standalone mode: just print "start,end" and exit (used by
+        # run_pipeline.py when config.yml doesn't specify a page range)
+        start, end = detect_page_range(pdf_path)
+        print(f"{start},{end}")
+        return
+
+    if len(sys.argv) < 3:
+        print(__doc__)
+        sys.exit(1)
     out_path = sys.argv[2]
-    start = 3
+    start = None
     end = None
     if "--start" in sys.argv:
         start = int(sys.argv[sys.argv.index("--start") + 1])
     if "--end" in sys.argv:
         end = int(sys.argv[sys.argv.index("--end") + 1])
-    if end is None:
-        end = start
+    if start is None or end is None:
+        print("No --start/--end given, auto-detecting page range ...", file=sys.stderr)
+        auto_start, auto_end = detect_page_range(pdf_path)
+        start = start or auto_start
+        end = end or auto_end
+        print(f"  -> detected pages {start}-{end}", file=sys.stderr)
 
     work_dir = "/tmp/voter_ocr_work"
     if os.path.isdir(work_dir):

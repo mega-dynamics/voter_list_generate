@@ -6,8 +6,22 @@ on:
     paths:
       - "pdfs/**.pdf"
       - "config.yml"
-      - "scripts/**"
-  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+      # NOTE: scripts/**.py is intentionally NOT here. Editing the OCR
+      # script itself no longer auto-triggers a run against the full PDF
+      # (which could take 15-20+ minutes and can't be cheaply cancelled
+      # mid-way without leaving a partial commit). After editing a script,
+      # go to the Actions tab and use "Run workflow" manually instead --
+      # you can test on just a couple of pages first (see inputs below).
+  workflow_dispatch:
+    inputs:
+      force_ocr:
+        description: "Force OCR to re-run even if cached (use after editing voter_roll_ocr.py)"
+        type: boolean
+        default: false
+      max_pages:
+        description: "Optional: cap every entry to at most N pages, for a quick test run (leave blank for full run)"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -53,13 +67,23 @@ jobs:
       - name: Run OCR pipeline (skips already-processed PDFs)
         env:
           TESSDATA_PREFIX: ${{ github.workspace }}/tessdata
-        run: python3 run_pipeline.py
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.force_ocr }}" = "true" ]; then
+            ARGS="$ARGS --force-ocr"
+          fi
+          if [ -n "${{ github.event.inputs.max_pages }}" ]; then
+            ARGS="$ARGS --max-pages ${{ github.event.inputs.max_pages }}"
+          fi
+          echo "Running: python3 run_pipeline.py $ARGS"
+          python3 run_pipeline.py $ARGS
 
       - name: Commit generated dashboards back to repo
         run: |
           git config user.name "voter-roll-bot"
           git config user.email "actions@github.com"
           git add docs/
+          git reset docs/_test/ 2>/dev/null || true
           git diff --cached --quiet && echo "No changes to commit" || git commit -m "Auto-update dashboards [skip ci]"
           git push
 

@@ -1,5 +1,8 @@
 tessdata/
-*.json
 __pycache__/
 *.pyc
 /tmp/
+docs/_test/
+# NOTE: docs/*.json (OCR cache) and docs/*.json.sig are intentionally
+# NOT ignored -- they must be committed so the pipeline can skip
+# re-running expensive OCR on unrelated config/metadata edits.
