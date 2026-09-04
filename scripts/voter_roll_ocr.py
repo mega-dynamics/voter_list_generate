@@ -221,7 +221,7 @@ def parse_rest_text(text):
     return name, rel_type, rel_name, house, age, gender
 
 
-def process_page(img_path, start_sno, locality_default=""):
+def process_page(img_path, start_sno, locality_default="", page_num=None):
     img = cv2.imread(img_path)
     h_lines, v_lines = detect_lines(img)
     grid_rows = find_grid_rows(h_lines)
@@ -270,6 +270,7 @@ def process_page(img_path, start_sno, locality_default=""):
             rec = extract_cell(img, top, bottom, left, right, expected_sno)
             if rec:
                 rec["area"] = locality
+                rec["page"] = page_num
                 records.append(rec)
     return records, locality
 
@@ -306,8 +307,13 @@ def main():
     if "--start-sno" in sys.argv:
         next_sno = int(sys.argv[sys.argv.index("--start-sno") + 1])
     for page_img in sorted(glob.glob(prefix + "-*.jpg")):
-        print(f"Processing {page_img} (starting sno {next_sno}) ...", file=sys.stderr)
-        records, locality = process_page(page_img, next_sno, locality)
+        # pdftoppm names files like "pg-03.jpg" -- the trailing number is
+        # the real PDF page number, which we attach to every record so
+        # each voter entry can be traced back to its source page.
+        m = re.search(r"-(\d+)\.jpg$", page_img)
+        page_num = int(m.group(1)) if m else None
+        print(f"Processing {page_img} (page {page_num}, starting sno {next_sno}) ...", file=sys.stderr)
+        records, locality = process_page(page_img, next_sno, locality, page_num)
         all_records.extend(records)
         if records:
             next_sno = max(r["sno"] for r in records) + 1
