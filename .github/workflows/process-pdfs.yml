@@ -1,0 +1,80 @@
+name: Process voter roll PDFs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pdfs/**.pdf"
+      - "config.yml"
+      - "scripts/**"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  ocr-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies (poppler + tesseract)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils tesseract-ocr
+
+      - name: Install Python dependencies
+        run: pip install opencv-python-headless numpy pyyaml
+
+      - name: Cache Tesseract best-accuracy language data
+        id: cache-tessdata
+        uses: actions/cache@v4
+        with:
+          path: tessdata
+          key: tessdata-best-hin-eng-v1
+
+      - name: Download Tesseract best (LSTM) Hindi + English models
+        if: steps.cache-tessdata.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p tessdata
+          curl -sL -o tessdata/hin.traineddata \
+            https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/hin.traineddata
+          curl -sL -o tessdata/eng.traineddata \
+            https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/eng.traineddata
+
+      - name: Run OCR pipeline (skips already-processed PDFs)
+        env:
+          TESSDATA_PREFIX: ${{ github.workspace }}/tessdata
+        run: python3 run_pipeline.py
+
+      - name: Commit generated dashboards back to repo
+        run: |
+          git config user.name "voter-roll-bot"
+          git config user.email "actions@github.com"
+          git add docs/
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "Auto-update dashboards [skip ci]"
+          git push
+
+      - name: Upload docs/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy-pages:
+    needs: ocr-and-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

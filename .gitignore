@@ -1,0 +1,5 @@
+tessdata/
+*.json
+__pycache__/
+*.pyc
+/tmp/

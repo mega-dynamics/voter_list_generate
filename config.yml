@@ -1,0 +1,24 @@
+# Add one entry per PDF you want processed. The workflow reprocesses an
+# entry automatically whenever this file OR the referenced PDF changes
+# (it skips entries whose output HTML already exists and is newer than
+# both the PDF and this config, so re-runs are cheap).
+#
+# start_page / end_page = the PDF page numbers of the MAIN ROLL GRID only
+#   (skip the cover page + ward-map page; check the "पृष्ठ संख्या : X / Y"
+#   footer on the first and last grid pages to find these).
+#
+# title / meta = shown in the generated dashboard's header.
+
+- pdf: pdfs/BHARATPUR_NAGAR_NIGAM-Ward_No-028-Part_No-003.pdf
+  start_page: 3
+  end_page: 48
+  title: "भरतपुर वार्ड 28 भाग 3"
+  meta: "राज्य निर्वाचन आयोग, राजस्थान | नगरनिगम: भरतपुर | वार्ड 28 | भाग 3 | मतदान केंद्र: 85 - दौलतराम शर्मा राजकीय उच्च प्राथमिक विद्यालय, नमक कटरा"
+  output: docs/ward28_part3.html
+
+# - pdf: pdfs/NEXT_WARD_FILE.pdf
+#   start_page: 3
+#   end_page: 40
+#   title: "भरतपुर वार्ड XX भाग Y"
+#   meta: "..."
+#   output: docs/wardXX_partY.html
