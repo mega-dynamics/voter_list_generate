@@ -12,3 +12,8 @@
   title: "मतदाता सूची"
   meta: ""
   output: docs/bharatpur_nagar_nigam_ward_no_028_part_no_003.html
+
+- pdf: pdfs/BHARATPUR NAGAR NIGAM-Ward No-030-Part No-001.pdf
+  title: "भरतपुर वार्ड नंबर 30 भाग 1"
+  meta: "bharatpur_nagar_nigam_ward_no_30_part_no_001"
+  output: docs/bharatpur_nagar_nigam_ward_no_30_part_no_001.html
