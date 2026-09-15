@@ -52,3 +52,8 @@
   title: "हथेनी वार्ड क्रमांक 1"
   meta: "89 - ररजककज उच मरधजनमक नरदरलज हसथनल कमरर न॰ 1"
   output: docs/hathaini_ward_no_001.html
+
+- pdf: pdfs/JAGHEENA-Ward No-001.pdf
+  title: "जागहीना वार्ड नंबर 1"
+  meta: "ठरकचर दशररज क ररजककज उच मरधजनमक नरदरलज जघलनर  कमरर॰न॰01"
+  output: docs/jagheena_ward_no_001.html
