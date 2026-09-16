@@ -57,3 +57,8 @@
   title: "जागहीना वार्ड नंबर 1"
   meta: "ठरकचर दशररज क ररजककज उच मरधजनमक नरदरलज जघलनर  कमरर॰न॰01"
   output: docs/jagheena_ward_no_001.html
+
+- pdf: pdfs/JAGHEENA-Ward No-001 (1).pdf
+  title: "Jagheena Ward No. 1"
+  meta: ""
+  output: docs/jagheena_ward_no_001_1_.html
