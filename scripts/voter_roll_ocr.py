@@ -49,6 +49,24 @@ def group_consecutive(arr, gap=5):
     return groups
 
 
+MIN_COL_GAP = 700  # px; filters spurious extra vertical lines (seen on partial
+                    # last pages) from the real ~964px column dividers at 400dpi
+
+
+def filter_grid_cols(v_lines):
+    """Keep only vertical lines spaced far enough apart to be real column
+    dividers, discarding spurious extra lines (observed on partial last
+    pages, where a stray artifact creates an extra line splitting one
+    real column into two)."""
+    if len(v_lines) < 2:
+        return v_lines
+    kept = [v_lines[0]]
+    for x in v_lines[1:]:
+        if x - kept[-1] >= MIN_COL_GAP:
+            kept.append(x)
+    return kept
+
+
 def detect_lines(img):
     """Return (h_lines, v_lines) — sorted lists of pixel coordinates for
     horizontal and vertical ruling lines detected via morphology."""
@@ -138,6 +156,24 @@ def detect_page_range(pdf_path):
     return 3, int(m.group(2))
 
 
+def is_cell_empty(cell):
+    """Detect a truly blank grid slot (happens whenever a locality/थोक
+    section's entry count isn't a multiple of the column count, so the
+    PDF renders the remaining slot(s) in that row with no border or
+    content at all). Measured via ink density rather than OCR, since an
+    OCR pass can occasionally hallucinate stray text even on a blank
+    cell -- pixel density is a much more reliable blank/non-blank
+    signal (real entries run ~5-15% dark-pixel coverage; blank slots
+    measure ~0%)."""
+    h, w = cell.shape[:2]
+    if h < 20 or w < 20:
+        return True
+    gray = cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY)
+    inner = gray[10:-10, 10:-10]
+    dark_frac = (inner < 200).mean()
+    return dark_frac < 0.01
+
+
 def detect_status_prefix(cell, h, w):
     """OCR just the narrow left slice of the box-number rectangle, where an
     S/E/R/O deletion-reason letter would appear if present. Returns '' if
@@ -152,19 +188,22 @@ def detect_status_prefix(cell, h, w):
     return ""
 
 
-def extract_cell(img, top, bottom, left, right, expected_sno):
-    """OCR one grid cell and return a parsed record dict (or None).
-    `expected_sno` is the serial number predicted from grid position —
-    used as the authoritative serial (see module docstring) since OCR of
-    the decorative box-number digits is unreliable for certain glyphs."""
+def extract_cell(img, top, bottom, left, right, next_sno):
+    """OCR one grid cell and return a parsed record dict (or None if the
+    slot is blank -- see is_cell_empty). `next_sno` is the next sequential
+    serial number to assign IF this cell turns out to contain a real
+    entry -- serial numbers are assigned by content order, not raw grid
+    position, since blank slots must not consume a number."""
     cell = img[top:bottom, left:right]
     h, w = cell.shape[:2]
     if h < 10 or w < 10:
         return None
+    if is_cell_empty(cell):
+        return None
 
     reason = detect_status_prefix(cell, h, w)
     status = "D" if reason else "A"
-    sno = expected_sno
+    sno = next_sno
 
     # --- ID code ---
     id_crop = cell[0:int(h * 0.22), int(w * 0.20):w]
@@ -252,6 +291,7 @@ def parse_rest_text(text):
 def process_page(img_path, start_sno, locality_default="", page_num=None):
     img = cv2.imread(img_path)
     h_lines, v_lines = detect_lines(img)
+    v_lines = filter_grid_cols(v_lines)
     grid_rows = find_grid_rows(h_lines)
 
     if len(grid_rows) < 2 or len(v_lines) < 2:
@@ -289,17 +329,18 @@ def process_page(img_path, start_sno, locality_default="", page_num=None):
 
     records = []
     n_cols = len(v_lines) - 1
+    next_sno = start_sno
     for r, (top, bottom, new_locality) in enumerate(row_tops):
         if new_locality:
             locality = new_locality
         for c in range(n_cols):
             left, right = v_lines[c], v_lines[c + 1]
-            expected_sno = start_sno + r * n_cols + c
-            rec = extract_cell(img, top, bottom, left, right, expected_sno)
+            rec = extract_cell(img, top, bottom, left, right, next_sno)
             if rec:
                 rec["area"] = locality
                 rec["page"] = page_num
                 records.append(rec)
+                next_sno += 1
     return records, locality
 
 
